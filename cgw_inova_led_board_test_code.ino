@@ -1,3 +1,4 @@
+#include <FastGPIO.h>
 #include "atascii.h"
 
 #define CLOCK     2
@@ -41,14 +42,14 @@ void setup() {
 
   pinMode(LED_BUILTIN, OUTPUT);
 
-  digitalWrite(RCLK, LOW);
+  FastGPIO::Pin<RCLK>::setOutputLow();
 
   char letter;
   int column, row, char_col;
   byte cur_char_row;
   String text = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  for(column = 0; column < NUM_COL; column+=8) {
-    letter = text.charAt(column / 8);
+  for(column = 0; column < NUM_COL / 8; column++) {
+    letter = text.charAt(column);
     draw_char_at_position(letter, column, 0, RED);
   }
 }
@@ -63,13 +64,13 @@ void draw_char_at_position(char character, int col_start, int row_start, uint16_
   char cur_char_row;
   int char_col;
   for(int row = row_start; row < NUM_ROW; row++) {
-    char cur_char_row = pgm_read_byte (&atascii_font[character][row]);
-    for(char_col = col_start; char_col < 8; char_col++) {
+    cur_char_row = pgm_read_byte(&atascii_font[character][row]);
+    for(char_col = 0; char_col < 8; char_col++) {
       if((1 << char_col) & cur_char_row) {
-        pattern[row][col_start] = (pattern[row][col_start] << (char_col << 1)) | color; // this is such a bad idea
+        pattern[row][col_start] = ((pattern[row][col_start] << 2) | (uint16_t) color); // this is such a bad idea
       }
       else {
-        pattern[row][col_start] = (pattern[row][col_start] << (char_col << 1)) & 0xfffd; // clear out the two bits for this column
+        pattern[row][col_start] = ((pattern[row][col_start] << 2) & 0b1111111111111100); // clear out the two bits for this column
       }
     }
   }
@@ -77,27 +78,44 @@ void draw_char_at_position(char character, int col_start, int row_start, uint16_
 
 void paint_pattern(uint16_t pattern[NUM_ROW][NUM_COL / 8]) {
   for(row = 0; row < NUM_ROW; row++) {
-    digitalWrite(R_ADDR0, (0b00000001 & row) ? HIGH : LOW);
-    digitalWrite(R_ADDR1, (0b00000010 & row) ? HIGH : LOW);
-    digitalWrite(R_ADDR2, (0b00000100 & row) ? HIGH : LOW);
+    if(0b00000001 & row) {
+      FastGPIO::Pin<R_ADDR0>::setOutputHigh();
+    }
+    else {
+      FastGPIO::Pin<R_ADDR0>::setOutputLow();
+    }
 
-    digitalWrite(RCLK, HIGH);
-    digitalWrite(R_LATCH, HIGH);
-    digitalWrite(R_LATCH, LOW);
-    digitalWrite(RCLK, LOW);
+    if(0b00000010 & row) {
+      FastGPIO::Pin<R_ADDR1>::setOutputHigh();
+    }
+    else {
+      FastGPIO::Pin<R_ADDR1>::setOutputLow();
+    }
+
+    if(0b00000100 & row) {
+      FastGPIO::Pin<R_ADDR2>::setOutputHigh();
+    }
+    else {
+      FastGPIO::Pin<R_ADDR2>::setOutputLow();
+    }
+
+    FastGPIO::Pin<RCLK>::setOutputHigh();
+    FastGPIO::Pin<R_LATCH>::setOutputHigh();
+    FastGPIO::Pin<R_LATCH>::setOutputLow();
+    FastGPIO::Pin<RCLK>::setOutputLow();
     
     for(i = 0; i < (NUM_COL / 8); i++) {
-      for(j = 0; i < 8; j++) {
+      for(j = 0; j < 8; j++) {
         if(0b0000000000000001 & (pattern[row][i] >> (j << 1))) {
-          digitalWrite(RED_DATA, HIGH);
+          FastGPIO::Pin<RED_DATA>::setOutputHigh();
         }
         if(0b0000000000000010 & (pattern[row][i] >> (j << 1))) {
-          digitalWrite(GRE_DATA, HIGH);
+          FastGPIO::Pin<GRE_DATA>::setOutputHigh();
         }
-        digitalWrite(CLOCK, HIGH);
-        digitalWrite(RED_DATA, LOW);
-        digitalWrite(GRE_DATA, LOW);
-        digitalWrite(CLOCK, LOW);
+        FastGPIO::Pin<CLOCK>::setOutputHigh();
+        FastGPIO::Pin<RED_DATA>::setOutputLow();
+        FastGPIO::Pin<GRE_DATA>::setOutputLow();
+        FastGPIO::Pin<CLOCK>::setOutputLow();
       }
     }
   }
