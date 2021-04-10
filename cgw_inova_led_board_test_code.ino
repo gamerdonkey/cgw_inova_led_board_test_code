@@ -11,24 +11,16 @@
 #define GRE_DATA  9
 #define CLEAR     ?
 
-#define NUM_COL 160
+#define NUM_COL   160
 #define NUM_ROW   8
-
-#define PULSE_MILLIS 10
-
-byte row = 0;
-
-uint16_t pattern[NUM_ROW][NUM_COL / 8]; // each column is two bits, so 8 can fit in 16-bit integer
-
-long last_change_millis = 0;
-
-int i, j, k;
 
 #define RED       1
 #define GREEN     2
 #define ORANGE    3
 
-void paint_pattern(uint16_t pattern[NUM_ROW][NUM_COL / 8]);
+uint16_t pattern[NUM_ROW][NUM_COL / 8]; // each column is two bits, so 8 can fit in 16-bit integer
+byte current_row = 0;
+int i, j, k;
 
 void setup() {
   pinMode(CLOCK, OUTPUT);
@@ -52,10 +44,12 @@ void setup() {
     letter = text.charAt(column);
     draw_char_at_position(letter, column, 0, RED);
   }
+
+  OCR0A = 0x7F; // setup Compare Register A to trigger when timer = 127
+  TIMSK0 |= _BV(OCIE0A); // configure timer0 with Compare A. timer0 should be setup at 1000hz for Arduino
 }
 
 void loop() {
-  paint_pattern(pattern);
 }
 
 void draw_char_at_position(char character, int col_start, int row_start, uint16_t color) {
@@ -76,47 +70,51 @@ void draw_char_at_position(char character, int col_start, int row_start, uint16_
   }
 }
 
-void paint_pattern(uint16_t pattern[NUM_ROW][NUM_COL / 8]) {
-  for(row = 0; row < NUM_ROW; row++) {
-    if(0b00000001 & row) {
-      FastGPIO::Pin<R_ADDR0>::setOutputHigh();
-    }
-    else {
-      FastGPIO::Pin<R_ADDR0>::setOutputLow();
-    }
+// Paint one row of display each time the timer fires
+// One row every 1ms = full update in 8ms =~ refresh rate of 120hz
+SIGNAL(TIMER0_COMPA_vect) {
+  if(0b00000001 & current_row) {
+    FastGPIO::Pin<R_ADDR0>::setOutputHigh();
+  }
+  else {
+    FastGPIO::Pin<R_ADDR0>::setOutputLow();
+  }
 
-    if(0b00000010 & row) {
-      FastGPIO::Pin<R_ADDR1>::setOutputHigh();
-    }
-    else {
-      FastGPIO::Pin<R_ADDR1>::setOutputLow();
-    }
+  if(0b00000010 & current_row) {
+    FastGPIO::Pin<R_ADDR1>::setOutputHigh();
+  }
+  else {
+    FastGPIO::Pin<R_ADDR1>::setOutputLow();
+  }
 
-    if(0b00000100 & row) {
-      FastGPIO::Pin<R_ADDR2>::setOutputHigh();
-    }
-    else {
-      FastGPIO::Pin<R_ADDR2>::setOutputLow();
-    }
+  if(0b00000100 & current_row) {
+    FastGPIO::Pin<R_ADDR2>::setOutputHigh();
+  }
+  else {
+    FastGPIO::Pin<R_ADDR2>::setOutputLow();
+  }
 
-    FastGPIO::Pin<RCLK>::setOutputHigh();
-    FastGPIO::Pin<R_LATCH>::setOutputHigh();
-    FastGPIO::Pin<R_LATCH>::setOutputLow();
-    FastGPIO::Pin<RCLK>::setOutputLow();
-    
-    for(i = 0; i < (NUM_COL / 8); i++) {
-      for(j = 0; j < 8; j++) {
-        if(0b0000000000000001 & (pattern[row][i] >> (j << 1))) {
-          FastGPIO::Pin<RED_DATA>::setOutputHigh();
-        }
-        if(0b0000000000000010 & (pattern[row][i] >> (j << 1))) {
-          FastGPIO::Pin<GRE_DATA>::setOutputHigh();
-        }
-        FastGPIO::Pin<CLOCK>::setOutputHigh();
-        FastGPIO::Pin<RED_DATA>::setOutputLow();
-        FastGPIO::Pin<GRE_DATA>::setOutputLow();
-        FastGPIO::Pin<CLOCK>::setOutputLow();
+  FastGPIO::Pin<RCLK>::setOutputHigh();
+  FastGPIO::Pin<R_LATCH>::setOutputHigh();
+  FastGPIO::Pin<R_LATCH>::setOutputLow();
+  FastGPIO::Pin<RCLK>::setOutputLow();
+
+  for(i = 0; i < (NUM_COL / 8); i++) {
+    for(j = 0; j < 8; j++) {
+      if(0b0000000000000001 & (pattern[current_row][i] >> (j << 1))) {
+        FastGPIO::Pin<RED_DATA>::setOutputHigh();
       }
+      if(0b0000000000000010 & (pattern[current_row][i] >> (j << 1))) {
+        FastGPIO::Pin<GRE_DATA>::setOutputHigh();
+      }
+      FastGPIO::Pin<CLOCK>::setOutputHigh();
+      FastGPIO::Pin<RED_DATA>::setOutputLow();
+      FastGPIO::Pin<GRE_DATA>::setOutputLow();
+      FastGPIO::Pin<CLOCK>::setOutputLow();
     }
+  }
+
+  if(++current_row == NUM_ROW) {
+    current_row = 0;
   }
 }
