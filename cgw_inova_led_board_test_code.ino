@@ -73,6 +73,8 @@ void draw_char_at_position(char character, int col_start, int row_start, uint16_
 // Paint one row of display each time the timer fires
 // One row every 1ms = full update in 8ms =~ refresh rate of 120hz
 SIGNAL(TIMER0_COMPA_vect) {
+  FastGPIO::Pin<RCLK>::setOutputLow();
+
   if(0b00000001 & current_row) {
     FastGPIO::Pin<R_ADDR0>::setOutputHigh();
   }
@@ -95,9 +97,7 @@ SIGNAL(TIMER0_COMPA_vect) {
   }
 
   FastGPIO::Pin<RCLK>::setOutputHigh();
-  FastGPIO::Pin<R_LATCH>::setOutputHigh();
   FastGPIO::Pin<R_LATCH>::setOutputLow();
-  FastGPIO::Pin<RCLK>::setOutputLow();
 
   for(i = 0; i < (NUM_COL / 8); i++) {
     for(j = 0; j < 8; j++) {
@@ -113,6 +113,8 @@ SIGNAL(TIMER0_COMPA_vect) {
       FastGPIO::Pin<CLOCK>::setOutputLow();
     }
   }
+
+  FastGPIO::Pin<R_LATCH>::setOutputHigh();
 
   if(++current_row == NUM_ROW) {
     current_row = 0;
