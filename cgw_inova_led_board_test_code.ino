@@ -39,7 +39,8 @@ void setup() {
   char letter;
   int column, row, char_col;
   byte cur_char_row;
-  String text = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+//  String text = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  String text = "Hello World!! 1234567890";
   for(column = 0; column < NUM_COL / 8; column++) {
     letter = text.charAt(column);
     draw_char_at_position(letter, column, 0, RED);
@@ -73,7 +74,23 @@ void draw_char_at_position(char character, int col_start, int row_start, uint16_
 // Paint one row of display each time the timer fires
 // One row every 1ms = full update in 8ms =~ refresh rate of 120hz
 SIGNAL(TIMER0_COMPA_vect) {
-  FastGPIO::Pin<RCLK>::setOutputLow();
+  for(i = 0; i < (NUM_COL / 8); i++) {
+    for(j = 0; j < 8; j++) {
+      if(0b0000000000000001 & (pattern[current_row][i] >> (j << 1))) {
+        FastGPIO::Pin<RED_DATA>::setOutputHigh();
+      }
+      if(0b0000000000000010 & (pattern[current_row][i] >> (j << 1))) {
+        FastGPIO::Pin<GRE_DATA>::setOutputHigh();
+      }
+      FastGPIO::Pin<CLOCK>::setOutputHigh();
+      FastGPIO::Pin<RED_DATA>::setOutputLow();
+      FastGPIO::Pin<GRE_DATA>::setOutputLow();
+      FastGPIO::Pin<CLOCK>::setOutputLow();
+    }
+  }
+
+  FastGPIO::Pin<R_LATCH>::setOutputLow();
+  FastGPIO::Pin<RCLK>::setOutputHigh();
 
   if(0b00000001 & current_row) {
     FastGPIO::Pin<R_ADDR0>::setOutputHigh();
@@ -96,25 +113,8 @@ SIGNAL(TIMER0_COMPA_vect) {
     FastGPIO::Pin<R_ADDR2>::setOutputLow();
   }
 
-  FastGPIO::Pin<RCLK>::setOutputHigh();
-  FastGPIO::Pin<R_LATCH>::setOutputLow();
-
-  for(i = 0; i < (NUM_COL / 8); i++) {
-    for(j = 0; j < 8; j++) {
-      if(0b0000000000000001 & (pattern[current_row][i] >> (j << 1))) {
-        FastGPIO::Pin<RED_DATA>::setOutputHigh();
-      }
-      if(0b0000000000000010 & (pattern[current_row][i] >> (j << 1))) {
-        FastGPIO::Pin<GRE_DATA>::setOutputHigh();
-      }
-      FastGPIO::Pin<CLOCK>::setOutputHigh();
-      FastGPIO::Pin<RED_DATA>::setOutputLow();
-      FastGPIO::Pin<GRE_DATA>::setOutputLow();
-      FastGPIO::Pin<CLOCK>::setOutputLow();
-    }
-  }
-
   FastGPIO::Pin<R_LATCH>::setOutputHigh();
+  FastGPIO::Pin<RCLK>::setOutputLow();
 
   if(++current_row == NUM_ROW) {
     current_row = 0;
